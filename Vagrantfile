@@ -72,10 +72,58 @@ Vagrant.configure(2) do |config|
   # Enable provisioning with a shell script. Additional provisioners such as
   # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
   # documentation for more information about their specific syntax and use.
-  #config.vm.provision "shell", inline: <<-SHELL
-  #  sudo apt-get update
-  #  sudo apt-get dist-upgrade -y
-  #  sudo apt-get install -y python2.7-dev python-pip build-essential libffi-dev libssl-dev libYAML-dev git
-  #  sudo pip install --upgrade ansible markupsafe setuptools passlib
-  #SHELL
+  config.vm.provision "shell", inline: <<-SHELL
+    sudo apt-get update
+    sudo apt-get dist-upgrade -y
+    sudo apt-get install -y autoconf dpkg-dev file g++ gcc libc-dev libpcre3-dev make pkg-config re2c \
+                            ca-certificates curl libedit2 libsqlite3-0 libxml2 xz-utils \
+                            --no-install-recommends
+    sudo mkdir -p /usr/local/etc/php/conf.d
+
+    sudo apt-get install -y apache2 \
+                            --no-install-recommends
+    sudo sed -ri 's/^export ([^=]+)=(.*)$/: ${\1:=\2}\nexport \1/' /etc/apache2/envvars
+    sudo a2dismod mpm_event
+    sudo a2enmod mpm_prefork rewrite expires
+
+    sudo apt-get install -y wget dirmngr gnupg2 \
+                            --no-install-recommends
+    sudo mkdir -p /usr/src/php
+    cd /usr/src
+    sudo wget -O php.tar.xz https://secure.php.net/get/php-7.1.8.tar.xz/from/this/mirror
+    sudo apt-get install -y apache2-dev \
+                            libcurl4-openssl-dev libedit-dev libsqlite3-dev libssl-dev libxml2-dev zlib1g-dev \
+                            libjpeg-dev libpng-dev
+                            --no-install-recommends
+    export CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
+    export CPPFLAGS="$CFLAGS"
+    export LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
+    sudo tar -Jxf /usr/src/php.tar.xz -C /usr/src/php --strip-components=1
+    cd /usr/src/php
+    gnuArch="$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)"
+    debMultiarch="$(dpkg-architecture -qDEB_BUILD_MULTIARCH)"
+    sudo ./configure \
+        --build="$gnuArch" \
+        --with-config-file-path=/usr/local/etc/php \
+        --with-config-file-scan-dir=/usr/local/etc/php/conf.d \
+        --disable-cgi \
+        --enable-ftp \
+        --enable-mbstring \
+        --enable-mysqlnd \
+        --with-curl \
+        --with-libedit \
+        --with-openssl \
+        --with-zlib \
+        --with-pcre-regex=/usr \
+        --with-libdir="lib/$debMultiarch" \
+        --with-apxs2 \
+        --with-pdo-mysql=mysqlnd \
+        --with-png-dir=/usr \
+        --with-jpeg-dir=/usr \
+        --with-gd
+    sudo make -j "$(nproc)"
+    sudo make install
+    sudo make clean
+    sudo pecl update-channels
+  SHELL
 end
