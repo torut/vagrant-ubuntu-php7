@@ -77,24 +77,18 @@ Vagrant.configure(2) do |config|
     sudo apt-get dist-upgrade -y
     sudo apt-get install -y autoconf dpkg-dev file g++ gcc libc-dev libpcre3-dev make pkg-config re2c \
                             ca-certificates curl libedit2 libsqlite3-0 libxml2 xz-utils \
+                            wget dirmngr gnupg2 \
+                            libcurl4-openssl-dev libedit-dev libsqlite3-dev libssl-dev libxml2-dev zlib1g-dev \
+                            libjpeg-dev libpng-dev libfreetype6-dev \
                             --no-install-recommends
-    sudo mkdir -p /usr/local/etc/php/conf.d
+    sudo mkdir -p /usr/local/etc/php/conf.d /usr/src/php
 
-    sudo apt-get install -y apache2 \
+    sudo apt-get install -y apache2 apache2-dev \
                             --no-install-recommends
-    sudo sed -ri 's/^export ([^=]+)=(.*)$/: ${\1:=\2}\nexport \1/' /etc/apache2/envvars
     sudo a2dismod mpm_event
     sudo a2enmod mpm_prefork rewrite expires
 
-    sudo apt-get install -y wget dirmngr gnupg2 \
-                            --no-install-recommends
-    sudo mkdir -p /usr/src/php
-    cd /usr/src
-    sudo wget -O php.tar.xz https://secure.php.net/get/php-7.1.8.tar.xz/from/this/mirror
-    sudo apt-get install -y apache2-dev \
-                            libcurl4-openssl-dev libedit-dev libsqlite3-dev libssl-dev libxml2-dev zlib1g-dev \
-                            libjpeg-dev libpng-dev
-                            --no-install-recommends
+    sudo wget -nv -O /usr/src/php.tar.xz https://secure.php.net/get/php-7.1.8.tar.xz/from/this/mirror
     export CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
     export CPPFLAGS="$CFLAGS"
     export LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
@@ -120,10 +114,21 @@ Vagrant.configure(2) do |config|
         --with-pdo-mysql=mysqlnd \
         --with-png-dir=/usr \
         --with-jpeg-dir=/usr \
+        --with-freetype-dir=/usr \
         --with-gd
     sudo make -j "$(nproc)"
     sudo make install
     sudo make clean
     sudo pecl update-channels
+    sudo service apache2 restart
+
+    sudo debconf-set-selections <<< 'mysql-server-5.6 mysql-server/root_password password rootpassword'
+    sudo debconf-set-selections <<< 'mysql-server-5.6 mysql-server/root_password_again password rootpassword'
+    sudo apt-get install -y mysql-server-5.6 \
+                            --no-install-recommends
+    sudo /bin/sh -lc "echo '[mysqld]\ncharacter-set-server=utf8\n[client]\ndefault-character-set=utf8' > /etc/mysql/conf.d/charset.cnf"
+    sudo service mysql restart
+    
+
   SHELL
 end
